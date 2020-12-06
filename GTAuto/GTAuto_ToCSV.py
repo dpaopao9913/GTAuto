@@ -23,6 +23,28 @@ def checkXMLElement(et):
     print(et.attrib)    ## attribute name
 
 
+## 機能：原文（source）を渡し、Google翻訳した訳文（target）を返す
+## 入力：source（原文）
+## 出力：OSと同じエンコードでデコード済みのs_after_rep（原文）r_after_rep（訳文）
+def autoGoogleTranslation(source):
+    # translation from En to Ja
+    trans_url = my_google_trans_api + '?text=' + source + '&source=en&target=ja'
+    r = requests.get(trans_url)  # 翻訳文章が返って来る
+    #print('translation: ', r.text, '\n')
+
+    # エンコードエラー処理用
+    # 参考：https://qiita.com/butada/items/33db39ced989c2ebf644
+    b1 = source.encode('gbk', "ignore")
+    s_after = b1.decode('gbk')
+    b2 = r.text.encode('gbk', "ignore")
+    r_after = b2.decode('gbk')
+
+    s_after_rep = s_after.replace('\n', ' ').replace(',', '、')
+    r_after_rep = r_after.replace('\n', ' ')
+
+    return s_after_rep, r_after_rep
+
+
 if __name__ == '__main__':
 
     args = sys.argv
@@ -54,7 +76,7 @@ if __name__ == '__main__':
     ss_input = ''.join(f_in.readlines())
     
     tree = lh.fromstring(ss_input)
-    list_source_seg = []  # 翻訳の際に、1回翻訳したソースセグメントは2回目以降翻訳しないようにするための識別用リスト
+    list_lang_pair = []  # 翻訳の際に、1回翻訳したソースセグメントは2回目以降翻訳しないようにするための識別用タプル(原文,訳文)のリスト
 
     count = -1
     for s, t in zip(tree.xpath('//seg-source//mrk'), tree.xpath('//target//mrk')):
@@ -76,22 +98,50 @@ if __name__ == '__main__':
         else:
             print('訳文なし')
 
-            ############# 自動翻訳 ################
+            ##########################################################################################################
+            s_after_rep = ''
+            r_after_rep = ''
 
-            # translation from En to Ja
-            trans_url = my_google_trans_api + '?text=' + s.text_content() + '&source=en&target=ja'
-            r = requests.get(trans_url)  # 翻訳文章が返って来る
-            print('translation: ', r.text, '\n')
+            if len(list_lang_pair) == 0:  # リストに言語ペアがない場合、翻訳して(原文, 翻訳文)のタプルを保持
 
-            # エンコードエラー処理用
-            # 参考：https://qiita.com/butada/items/33db39ced989c2ebf644
-            b1 = s.text_content().encode('gbk', "ignore")
-            s_after = b1.decode('gbk')
-            b2 = r.text.encode('gbk', "ignore")
-            r_after = b2.decode('gbk')
+                print('はじめのリスト追加です。GoogleTranslationAPI が呼ばれました。')
 
-            f_out.write(s_after.replace('\n', ' ').replace(',', '、') + "," + r_after.replace('\n', ' ') + "\n")
-            #################################################################
+                ############# 自動翻訳 ###########################################
+                s_after_rep, r_after_rep = autoGoogleTranslation(s.text_content())
+                #################################################################
+                
+                f_out.write(s_after_rep + "," + r_after_rep + "\n")
+
+                list_lang_pair.append(tuple([s_after_rep, r_after_rep]))  
+            else:
+
+                isDuplicated = False  # リストに同じ原文があるかどうかチェック用
+                list_index = -1       # リストに同じ原文がある場合のリストのインデックス
+
+                for ii in range(len(list_lang_pair)):
+                    isDuplicated = False if list_lang_pair[ii][0] != s.text_content() else True
+                    #print(len(list_lang_pair), list_lang_pair[ii][0], isDuplicated)
+                    if isDuplicated:
+                        list_index = ii
+                        break
+             
+                if isDuplicated:     # リストに対応する言語ペアのタプルがある場合、スキップ
+                    print('言語ペアのリストの中に同一の原文を見つけました。翻訳をスキップします。')
+
+                    f_out.write(list_lang_pair[list_index][0] + "," + list_lang_pair[list_index][1] + "\n")
+                else:                # リストに対応する言語ペアのタプルがなし場合、翻訳して(原文, 翻訳文)のタプルを保持
+
+                    print('GoogleTranslationAPI が呼ばれました。')
+
+                    ############# 自動翻訳 ###########################################
+                    s_after_rep, r_after_rep = autoGoogleTranslation(s.text_content())
+                    #################################################################
+                
+                    f_out.write(s_after_rep + "," + r_after_rep + "\n")
+
+                    list_lang_pair.append(tuple([s_after_rep, r_after_rep])) 
+            ##########################################################################################################
+
 
         print('\n')
 
