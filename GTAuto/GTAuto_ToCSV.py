@@ -34,13 +34,20 @@ def autoGoogleTranslation(source):
 
     # エンコードエラー処理用
     # 参考：https://qiita.com/butada/items/33db39ced989c2ebf644
-    b1 = source.encode('gbk', "ignore")
-    s_after = b1.decode('gbk')
-    b2 = r.text.encode('gbk', "ignore")
-    r_after = b2.decode('gbk')
+    #b1 = source.encode('gbk', "ignore")
+    #s_after = b1.decode('gbk')
+    #b2 = r.text.encode('gbk', "ignore")
+    #r_after = b2.decode('gbk')
+    #b1 = source.encode('utf-8', "ignore")
+    #s_after = b1.decode('utf-8')
+    #b2 = r.text.encode('utf-8', "ignore")
+    #r_after = b2.decode('utf-8')
 
-    s_after_rep = s_after.replace('\n', ' ').replace(',', '、')
-    r_after_rep = r_after.replace('\n', ' ')
+
+    #s_after_rep = s_after.replace('\n', ' ').replace(',', '、')
+    #r_after_rep = r_after.replace('\n', ' ')
+    s_after_rep = source.replace('\n', ' ').replace(',', '、')
+    r_after_rep = r.text.replace('\n', ' ').replace(',', '、')
 
     return s_after_rep, r_after_rep
 
@@ -61,7 +68,7 @@ if __name__ == '__main__':
     # 必要なファイルを開く
     try:
         f_in  = open(args[1], encoding='utf-8', mode='r')
-        f_out = open(args[2], mode='w')
+        f_out = open(args[2], encoding='utf-8', mode='w')
     except FileNotFoundError as err:
         print("ファイルが存在しないため、読み込めませんでした。")
         exit()
@@ -94,7 +101,7 @@ if __name__ == '__main__':
         # 翻訳があるかどうかチェック
         if t.text_content() != '':
             print('訳文あり')
-            f_out.write(s.text_content().replace('\n', ' ') + "," + t.text_content().replace('\n', ' ') + "\n")
+            f_out.write(s.text_content().replace('\n', ' ').replace(',', '、') + "," + t.text_content().replace('\n', ' ').replace(',', '、') + "\n")
         else:
             print('訳文なし')
 
@@ -111,6 +118,7 @@ if __name__ == '__main__':
                 #################################################################
                 
                 f_out.write(s_after_rep + "," + r_after_rep + "\n")
+                print('訳文: ' + r_after_rep)
 
                 list_lang_pair.append(tuple([s_after_rep, r_after_rep]))  
             else:
@@ -119,7 +127,7 @@ if __name__ == '__main__':
                 list_index = -1       # リストに同じ原文がある場合のリストのインデックス
 
                 for ii in range(len(list_lang_pair)):
-                    isDuplicated = False if list_lang_pair[ii][0] != s.text_content() else True
+                    isDuplicated = False if list_lang_pair[ii][0] != s.text_content().replace('\n', ' ').replace(',', '、') else True
                     #print(len(list_lang_pair), list_lang_pair[ii][0], isDuplicated)
                     if isDuplicated:
                         list_index = ii
@@ -138,6 +146,7 @@ if __name__ == '__main__':
                     #################################################################
                 
                     f_out.write(s_after_rep + "," + r_after_rep + "\n")
+                    print('訳文: ' + r_after_rep)
 
                     list_lang_pair.append(tuple([s_after_rep, r_after_rep])) 
             ##########################################################################################################
