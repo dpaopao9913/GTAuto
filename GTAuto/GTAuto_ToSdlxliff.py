@@ -80,7 +80,7 @@ if __name__ == '__main__':
         for tt in t.itertext():
             t_temp.append(tt)
         
-        s_all_text = ' '.join(s_temp)
+        s_all_text = ' '.join(s_temp).replace('&', ' and ')  # convert "&" to "and"
         t_all_text = ' '.join(t_temp)
 
         print('line: ' + str(count) + ', ' + s_all_text + ", " + t_all_text)
