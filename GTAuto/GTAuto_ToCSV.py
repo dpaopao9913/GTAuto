@@ -1,5 +1,4 @@
 import os
-import lxml.html as lh
 from lxml import etree
 import requests
 import sys
@@ -10,42 +9,15 @@ import sys
 my_google_trans_api = "https://script.google.com/macros/s/AKfycbxqzqhZlbG6Wkko7vs988Kw-7n9mmQZerDjC2tCQ_ATwb2vJAU/exec"
 
 
-def checkPath():
-    print('Hello!')
-    print('__name__ is', my_google_trans_api)
-    print('getcwd:      ', os.getcwd())
-    print('dirname:    ', os.path.dirname(__file__))
-    print('outfilename:    ', output_sdlxliff_filename)
-
-## <element attribute="attribute value">contents</element>
-def checkXMLElement(et):
-    print(et.tag)       ## element name
-    print(et.attrib)    ## attribute name
-
-
 ## 機能：原文（source）を渡し、Google翻訳した訳文（target）を返す
 ## 入力：source（原文）
-## 出力：OSと同じエンコードでデコード済みのs_after_rep（原文）r_after_rep（訳文）
+## 出力：原文と訳文のペア（CSV形式で行ごと出力できるようにフォーマットを整える）
 def autoGoogleTranslation(source):
     # translation from En to Ja
     trans_url = my_google_trans_api + '?text=' + source + '&source=en&target=ja'
     r = requests.get(trans_url)  # 翻訳文章が返って来る
     #print('translation: ', r.text, '\n')
 
-    # エンコードエラー処理用
-    # 参考：https://qiita.com/butada/items/33db39ced989c2ebf644
-    #b1 = source.encode('gbk', "ignore")
-    #s_after = b1.decode('gbk')
-    #b2 = r.text.encode('gbk', "ignore")
-    #r_after = b2.decode('gbk')
-    #b1 = source.encode('utf-8', "ignore")
-    #s_after = b1.decode('utf-8')
-    #b2 = r.text.encode('utf-8', "ignore")
-    #r_after = b2.decode('utf-8')
-
-
-    #s_after_rep = s_after.replace('\n', ' ').replace(',', '、')
-    #r_after_rep = r_after.replace('\n', ' ')
     s_after_rep = source.replace('\n', ' ').replace(',', '、')
     r_after_rep = r.text.replace('\n', ' ').replace(',', '、')
 
@@ -80,28 +52,51 @@ if __name__ == '__main__':
     print("Input File: " + args[1])
 
     f_out.write("***ORIGINAL TEXT***,***TRANSLATION***\n")  # CSVのヘッダー定義
-    ss_input = ''.join(f_in.readlines())
+
+    ss_input = ''.join(f_in.readlines())   
+    tree = etree.fromstring(ss_input)
+
+    # lxml.etreeで名前空間を指定してパースする
+    # 参考: トホホな疑問(13) Python、lxml、デフォルト名前空間とXPath（https://jhalfmoon.com/dbc/2019/10/20/%E3%83%88%E3%83%9B%E3%83%9B%E3%81%AA%E7%96%91%E5%95%8F13-python%E3%80%81lxml%E3%80%81%E3%83%87%E3%83%95%E3%82%A9%E3%83%AB%E3%83%88%E5%90%8D%E5%89%8D%E7%A9%BA%E9%96%93%E3%81%A8xpath/） 
+    mynsmap = dict()
+    mynsmap['x'] = tree.nsmap[None]
     
-    tree = lh.fromstring(ss_input)
+    #print(mynsmap)
+    #print(tree)
+    #print(len(tree))
+
     list_lang_pair = []  # 翻訳の際に、1回翻訳したソースセグメントは2回目以降翻訳しないようにするための識別用タプル(原文,訳文)のリスト
 
-    count = -1
-    for s, t in zip(tree.xpath('//seg-source//mrk'), tree.xpath('//target//mrk')):
+    count = 0
+    for s, t in zip(tree.xpath('//x:seg-source//x:mrk', namespaces=mynsmap), tree.xpath('//x:target//x:mrk', namespaces=mynsmap)):
  
         count += 1
-        #print('count= ' + str(count))
-        print('line: ' + str(count) + ', ' + s.text_content() + ", " + t.text_content())
+
+        # itertext(self, tag=None, with_tail=True, *tags) を使ってサブツリー内すべてのテキストを抜き出す
+        # 参考: https://lxml.de/api/lxml.etree._Element-class.html
+
+        s_temp = []
+        t_temp = []
+        for ss in s.itertext():
+            s_temp.append(ss)
+        for tt in t.itertext():
+            t_temp.append(tt)
+        
+        s_all_text = ' '.join(s_temp).replace('&', ' and ')  # convert "&" to "and"
+        t_all_text = ' '.join(t_temp)
+
+        print('line: ' + str(count) + ', ' + s_all_text + ", " + t_all_text)
 
         # 原文があるかどうかチェック（念のため）
-        if s.text_content() != '':
+        if s_all_text != '':
             print('原文あり')
         else:
             print('原文なし')
 
         # 翻訳があるかどうかチェック
-        if t.text_content() != '':
+        if t_all_text != '':
             print('訳文あり')
-            f_out.write(s.text_content().replace('\n', ' ').replace(',', '、') + "," + t.text_content().replace('\n', ' ').replace(',', '、') + "\n")
+            f_out.write(s_all_text.replace('\n', ' ').replace(',', '、') + "," + t_all_text.replace('\n', ' ').replace(',', '、') + "\n")
         else:
             print('訳文なし')
 
@@ -114,21 +109,24 @@ if __name__ == '__main__':
                 print('はじめのリスト追加です。GoogleTranslationAPI が呼ばれました。')
 
                 ############# 自動翻訳 ###########################################
-                s_after_rep, r_after_rep = autoGoogleTranslation(s.text_content())
+                s_after_rep, r_after_rep = autoGoogleTranslation(s_all_text)
                 #################################################################
-                
-                f_out.write(s_after_rep + "," + r_after_rep + "\n")
-                print('訳文: ' + r_after_rep)
 
-                list_lang_pair.append(tuple([s_after_rep, r_after_rep]))  
+                f_out.write(s_after_rep + "," + r_after_rep + "\n")
+                
+                ############# 出力用ツリーの当該箇所に訳文を挿入 ####################
+                t.text = r_after_rep
+                list_lang_pair.append(tuple([s_after_rep, r_after_rep])) 
+                #################################################################
+                 
             else:
 
                 isDuplicated = False  # リストに同じ原文があるかどうかチェック用
                 list_index = -1       # リストに同じ原文がある場合のリストのインデックス
 
                 for ii in range(len(list_lang_pair)):
-                    isDuplicated = False if list_lang_pair[ii][0] != s.text_content().replace('\n', ' ').replace(',', '、') else True
-                    #print(len(list_lang_pair), list_lang_pair[ii][0], isDuplicated)
+                    isDuplicated = False if list_lang_pair[ii][0] != s_all_text.replace('\n', ' ').replace(',', '、') else True
+                    print(len(list_lang_pair), list_lang_pair[ii][0], isDuplicated)
                     if isDuplicated:
                         list_index = ii
                         break
@@ -137,23 +135,35 @@ if __name__ == '__main__':
                     print('言語ペアのリストの中に同一の原文を見つけました。翻訳をスキップします。')
 
                     f_out.write(list_lang_pair[list_index][0] + "," + list_lang_pair[list_index][1] + "\n")
+
+                    ############# 出力用ツリーの当該箇所に訳文を挿入 ####################
+                    t.text = list_lang_pair[list_index][1] 
+                    #################################################################
+
                 else:                # リストに対応する言語ペアのタプルがなし場合、翻訳して(原文, 翻訳文)のタプルを保持
 
                     print('GoogleTranslationAPI が呼ばれました。')
 
                     ############# 自動翻訳 ###########################################
-                    s_after_rep, r_after_rep = autoGoogleTranslation(s.text_content())
+                    s_after_rep, r_after_rep = autoGoogleTranslation(s_all_text)
                     #################################################################
-                
-                    f_out.write(s_after_rep + "," + r_after_rep + "\n")
-                    print('訳文: ' + r_after_rep)
 
-                    list_lang_pair.append(tuple([s_after_rep, r_after_rep])) 
+                    f_out.write(s_after_rep + "," + r_after_rep + "\n")
+                
+                    ############# 出力用ツリーの当該箇所に訳文を挿入 ####################
+                    t.text = r_after_rep
+                    list_lang_pair.append(tuple([s_after_rep, r_after_rep]))
+                    #################################################################
+
             ##########################################################################################################
 
 
         print('\n')
 
+
+    ############# 出力用ツリーを出力用sdlxliffファイルへ出力 ############
+    # f_out.write(etree.tostring(tree, encoding='utf-8', method="xml", xml_declaration=True).decode('utf-8'))
+    #################################################################
 
     f_in.close()
     f_out.close()
