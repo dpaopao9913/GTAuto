@@ -41,7 +41,7 @@
 
 # GoogleTranslationAuto
 
-Automated machine translation using Google translation API from .sdlxliff file and output the translation as .csv/.sdlxliff file.
+Automated machine translation using Google translation API from .sdlxliff file and output the translation as .csv/.sdlxliff file.<br>
 翻訳支援ソフトTrados専用形式の.sdlxliffファイルから、原文を自動抽出して、Google自動翻訳した後、訳文をcsvファイルまたはsdlxliffファイルとして出力するプログラム。
 
 
