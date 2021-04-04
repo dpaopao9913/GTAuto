@@ -83,9 +83,13 @@ Automated machine translation using Google translation API from .sdlxliff file a
 
 requests/lxml packages can be installed by (if necessary): 
 
-`$ conda install requests` 
+```sh
+$ conda install requests
+```
 
-`$ conda install lxml`
+```sh
+$ conda install lxml
+```
 
 
 # Usage
@@ -98,15 +102,23 @@ Run `pyBatchTest01.bat` or `pyBatchTest02.bat` after updating input file names i
 - How to change translation language pair ? <br>
   Default language pair is "English -> Japanse". If you have to change the language pair, you can change the following line in `pyBatchTest01.bat` and `pyBatchTest02.bat`: 
   
-  `trans_url = my_google_trans_api + '?text=' + source + '&source=en&target=ja'`
+  ```python
+  trans_url = my_google_trans_api + '?text=' + source + '&source=en&target=ja'
+  ```
     
   If you want to use "Japanse -> English" pair, you can change as below:
   
-  `trans_url = my_google_trans_api + '?text=' + source + '&source=ja&target=en'`
+  ```python
+  trans_url = my_google_trans_api + '?text=' + source + '&source=ja&target=en'
+  ```
   
   If you want to use "Chinese -> Japanese" pair, you can change as below:
   
-  `trans_url = my_google_trans_api + '?text=' + source + '&source=zh-CN&target=ja'`
+  ```python
+  trans_url = my_google_trans_api + '?text=' + source + '&source=zh-CN&target=ja'
+  ```
+  
+  *Note: you can change any source and target langage code as you like.
 
 
 # License
