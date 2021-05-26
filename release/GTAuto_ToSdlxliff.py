@@ -14,7 +14,7 @@ my_google_trans_api = "https://script.google.com/macros/s/AKfycbxqzqhZlbG6Wkko7v
 ## 出力：原文と訳文のペア（CSV形式で行ごと出力できるようにフォーマットを整える）
 def autoGoogleTranslation(source):
     # translation from En to Ja
-    trans_url = my_google_trans_api + '?text=' + source + '&source=en&target=ja'
+    trans_url = my_google_trans_api + '?text=' + source + '&source=zh&target=ja'
     r = requests.get(trans_url)  # 翻訳文章が返って来る
     #print('translation: ', r.text, '\n')
 
@@ -22,6 +22,19 @@ def autoGoogleTranslation(source):
     r_after_rep = r.text.replace('\n', ' ').replace(',', '、')
 
     return s_after_rep, r_after_rep
+
+
+# セグメントがロックされているかどうかを確認する関数
+def checkSegmentLocked(s):
+    for ancestor in s.iterancestors():
+        if 'trans-unit' in ancestor.tag:
+            for child in ancestor.iterchildren():
+                if 'seg-defs' in child.tag:
+                    for child2 in child.iterchildren():
+                        if 'seg' in child2.tag:
+                            if child2.get('locked') == 'true':
+                                return True
+    return False
 
 
 if __name__ == '__main__':
@@ -34,7 +47,7 @@ if __name__ == '__main__':
         print('usage: <*.py> <input_filename> <output_filename>')
         print('yours: ')  
         for i in range(len(args)):
-            print('args[' + i + ']= ' + str(args[i]))
+            print('args[' + str(i) + ']= ' + str(args[i]))
         exit()
 
     # 必要なファイルを開く
@@ -91,63 +104,66 @@ if __name__ == '__main__':
         else:
             print('原文なし')
 
-        # 翻訳があるかどうかチェック
-        if t_all_text != '':
-            print('訳文あり')
+        # セグメントがロックされているかどうかチェック
+        # <sdl:seg id="2171" locked="true" ... はセグメントの数だけある。セグメントがロックされていれば、タグsdl:segに属性lockedが含まれる
+        IsSegmentLocked = checkSegmentLocked(s)
+        if IsSegmentLocked:
+            print('セグメントはロックされているのでスキップします')
+            continue
+
+
+        ##########################################################################################################
+        s_after_rep = ''
+        r_after_rep = ''
+
+        if len(list_lang_pair) == 0:  # リストに言語ペアがない場合、翻訳して(原文, 翻訳文)のタプルを保持
+
+            print('はじめのリスト追加です。GoogleTranslationAPI が呼ばれました。')
+
+            ############# 自動翻訳 ###########################################
+            s_after_rep, r_after_rep = autoGoogleTranslation(s_all_text)
+            #################################################################
+            
+            ############# 出力用ツリーの当該箇所に訳文を挿入 ####################
+            t.text = r_after_rep
+            list_lang_pair.append(tuple([s_after_rep, r_after_rep])) 
+            print('訳文: %s' % r_after_rep)
+            #################################################################
+                
         else:
-            print('訳文なし')
 
-            ##########################################################################################################
-            s_after_rep = ''
-            r_after_rep = ''
+            isDuplicated = False  # リストに同じ原文があるかどうかチェック用
+            list_index = -1       # リストに同じ原文がある場合のリストのインデックス
 
-            if len(list_lang_pair) == 0:  # リストに言語ペアがない場合、翻訳して(原文, 翻訳文)のタプルを保持
+            for ii in range(len(list_lang_pair)):
+                isDuplicated = False if list_lang_pair[ii][0] != s_all_text.replace('\n', ' ').replace(',', '、') else True
+                print(len(list_lang_pair), list_lang_pair[ii][0], isDuplicated)
+                if isDuplicated:
+                    list_index = ii
+                    break
+            
+            if isDuplicated:     # リストに対応する言語ペアのタプルがある場合、スキップ
+                print('言語ペアのリストの中に同一の原文を見つけました。翻訳をスキップします。')
 
-                print('はじめのリスト追加です。GoogleTranslationAPI が呼ばれました。')
+                ############# 出力用ツリーの当該箇所に訳文を挿入 ####################
+                t.text = list_lang_pair[list_index][1] 
+                #################################################################
+
+            else:                # リストに対応する言語ペアのタプルがなし場合、翻訳して(原文, 翻訳文)のタプルを保持
+
+                print('GoogleTranslationAPI が呼ばれました。')
 
                 ############# 自動翻訳 ###########################################
                 s_after_rep, r_after_rep = autoGoogleTranslation(s_all_text)
                 #################################################################
-                
+            
                 ############# 出力用ツリーの当該箇所に訳文を挿入 ####################
                 t.text = r_after_rep
-                list_lang_pair.append(tuple([s_after_rep, r_after_rep])) 
+                list_lang_pair.append(tuple([s_after_rep, r_after_rep]))
+                print('訳文: %s' % r_after_rep)
                 #################################################################
-                 
-            else:
 
-                isDuplicated = False  # リストに同じ原文があるかどうかチェック用
-                list_index = -1       # リストに同じ原文がある場合のリストのインデックス
-
-                for ii in range(len(list_lang_pair)):
-                    isDuplicated = False if list_lang_pair[ii][0] != s_all_text.replace('\n', ' ').replace(',', '、') else True
-                    print(len(list_lang_pair), list_lang_pair[ii][0], isDuplicated)
-                    if isDuplicated:
-                        list_index = ii
-                        break
-             
-                if isDuplicated:     # リストに対応する言語ペアのタプルがある場合、スキップ
-                    print('言語ペアのリストの中に同一の原文を見つけました。翻訳をスキップします。')
-
-                    ############# 出力用ツリーの当該箇所に訳文を挿入 ####################
-                    t.text = list_lang_pair[list_index][1] 
-                    #################################################################
-
-                else:                # リストに対応する言語ペアのタプルがなし場合、翻訳して(原文, 翻訳文)のタプルを保持
-
-                    print('GoogleTranslationAPI が呼ばれました。')
-
-                    ############# 自動翻訳 ###########################################
-                    s_after_rep, r_after_rep = autoGoogleTranslation(s_all_text)
-                    #################################################################
-                
-                    ############# 出力用ツリーの当該箇所に訳文を挿入 ####################
-                    t.text = r_after_rep
-                    list_lang_pair.append(tuple([s_after_rep, r_after_rep]))
-                    #################################################################
-
-            ##########################################################################################################
-
+        ##########################################################################################################
 
         print('\n')
 
